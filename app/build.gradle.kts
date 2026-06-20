@@ -10,15 +10,15 @@ plugins {
 }
 
 android {
-    namespace = "com.cycb.chat"
+    namespace = "org.cycb.canvas"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.cycb.chat"
+        applicationId = "org.cycb.canvas"
         minSdk = 29
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.6_BETA"
+        versionCode = 9
+        versionName = "1.0 prerelease"
 
         vectorDrawables {
             useSupportLibrary = true

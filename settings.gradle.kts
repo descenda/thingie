@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "CYCB Chat"
+rootProject.name = "CYCB Canvas"
 include(":app")

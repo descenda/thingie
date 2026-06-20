@@ -1,4 +1,4 @@
-# CYCB Chat - Android Application
+# CYCB Canvas - Android Application
 
 > **⚠️ EARLY DEVELOPMENT - BETA VERSION**  
 > This app is currently in active development and may contain bugs, incomplete features, or breaking changes. Use at your own risk. Bug reports and feedback are welcome, but please be patient as features are still being implemented.
@@ -7,7 +7,7 @@ Modern Android chat application built with Jetpack Compose and Material 3 Expres
 
 ## Overview
 
-CYCB Chat is a feature-rich real-time messaging application for Android that provides seamless communication through text, voice messages, images, GIFs, and voice calls. Built with modern Android development practices and Material Design 3.
+CYCB Canvas is a feature-rich real-time messaging application for Android that provides seamless communication through text, voice messages, images, GIFs, and voice calls. Built with modern Android development practices and Material Design 3.
 
 ## Tech Stack
 
@@ -257,7 +257,7 @@ The app uses dynamic API configuration in `ApiConfig.kt`:
 ### Firebase Setup
 
 1. Create a Firebase project
-2. Add Android app with package name `com.cycb.chat`
+2. Add Android app with package name `org.cycb.canvas`
 3. Download `google-services.json`
 4. Enable Firebase Cloud Messaging
 5. Configure notification channels
@@ -270,7 +270,7 @@ The app uses Agora RTC SDK for voice calls. Ensure your backend provides valid A
 
 - **Version Code**: 8
 - **Version Name**: 0.6_BETA
-- **Package Name**: com.cycb.chat
+- **Package Name**: org.cycb.canvas
 
 ## Architecture
 
