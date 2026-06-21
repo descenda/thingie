@@ -19,7 +19,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -38,6 +46,7 @@ fun GifPicker(
         skipPartiallyExpanded = false
     )
     val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+    val haptic = LocalHapticFeedback.current
     var searchQuery by remember { mutableStateOf("") }
     var gifs by remember { mutableStateOf<List<TenorGif>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -49,6 +58,9 @@ fun GifPicker(
         errorMessage = null
         try {
             gifs = getTrendingGifs()
+            // Auto-focus search when opened
+            delay(300)
+            focusRequester.requestFocus()
         } catch (e: Exception) {
             android.util.Log.e("GifPicker", "Failed to load trending GIFs", e)
             errorMessage = "Failed to load GIFs"
@@ -137,7 +149,10 @@ fun GifPicker(
                         onValueChange = { searchQuery = it },
                         modifier = Modifier
                             .weight(1f)
-                            .focusRequester(focusRequester),
+                            .focusRequester(focusRequester)
+                            .semantics {
+                                contentDescription = "Search GIFs"
+                            },
                         textStyle = MaterialTheme.typography.bodyLarge.copy(
                             color = MaterialTheme.colorScheme.onSurface
                         ),
@@ -174,7 +189,12 @@ fun GifPicker(
                 }
             }
 
-            Box(modifier = Modifier.weight(1f)) {
+            Box(modifier = Modifier
+                .weight(1f)
+                .semantics { 
+                    liveRegion = LiveRegionMode.Polite 
+                }
+            ) {
                 when {
                     errorMessage != null -> {
                         Column(
@@ -219,7 +239,7 @@ fun GifPicker(
                                 GifItem(
                                     gif = gif,
                                     onClick = {
-
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         val gifUrl = gif.media_formats["tinygif"]?.url
                                             ?: gif.media_formats["gif"]?.url
                                             ?: gif.url
@@ -269,7 +289,14 @@ fun GifItem(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(1f)
-            .clickable(onClick = onClick),
+            .semantics {
+                role = Role.Button
+                contentDescription = gif.title ?: "GIF result"
+            }
+            .clickable(
+                onClick = onClick,
+                onClickLabel = "Select this GIF"
+            ),
         shape = RoundedCornerShape(12.dp),
         tonalElevation = 1.dp
     ) {

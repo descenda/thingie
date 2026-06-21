@@ -17,7 +17,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
@@ -33,6 +39,7 @@ fun GifMessage(
     var isLoading by remember { mutableStateOf(true) }
     var hasError by remember { mutableStateOf(false) }
     var shouldPlay by remember { mutableStateOf(autoPlayGifs) }
+    val haptic = LocalHapticFeedback.current
 
     LaunchedEffect(autoPlayGifs) {
         shouldPlay = autoPlayGifs
@@ -55,8 +62,14 @@ fun GifMessage(
                     else
                         MaterialTheme.colorScheme.surfaceVariant
                 )
-                .clickable {
-
+                .semantics {
+                    role = Role.Button
+                    contentDescription = if (shouldPlay) "Animated GIF" else "GIF, press to play"
+                }
+                .clickable(
+                    onClickLabel = if (shouldPlay) "Stop GIF" else "Play GIF"
+                ) {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     if (!autoPlayGifs) {
                         shouldPlay = !shouldPlay
                     }
@@ -68,7 +81,7 @@ fun GifMessage(
                     .data(gifUrl)
                     .crossfade(true)
                     .build(),
-                contentDescription = "GIF",
+                contentDescription = null, // Handled by Box semantics
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(RoundedCornerShape(16.dp)),

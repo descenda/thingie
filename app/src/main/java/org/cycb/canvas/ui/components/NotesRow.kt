@@ -14,7 +14,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -56,16 +62,29 @@ fun AddNoteItem(
     note: Note?,
     onClick: () -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
+    val description = if (note != null) "Your note: ${note.content}" else "Add a note"
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(72.dp)
+        modifier = Modifier
+            .width(72.dp)
+            .semantics(mergeDescendants = true) {
+                contentDescription = description
+                role = Role.Button
+            }
+            .clickable(
+                onClickLabel = if (note != null) "Edit your note" else "Add a note"
+            ) {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onClick()
+            }
     ) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(72.dp)
                 .padding(4.dp)
-                .clickable(onClick = onClick)
         ) {
 
             AsyncImage(
@@ -138,11 +157,24 @@ fun NoteItem(
     note: Note,
     onClick: () -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
+    val userName = note.userId.displayName ?: note.userId.username
+    val description = "Note from $userName: ${note.content}"
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .width(72.dp)
-            .clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                contentDescription = description
+                role = Role.Button
+            }
+            .clickable(
+                onClickLabel = "View $userName's note"
+            ) {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
     ) {
         Box(
             modifier = Modifier

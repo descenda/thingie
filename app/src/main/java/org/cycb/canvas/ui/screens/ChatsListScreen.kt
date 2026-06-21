@@ -28,6 +28,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -232,13 +236,27 @@ fun ChatListItem(
     onLongClick: () -> Unit
 ) {
     val hapticFeedback = LocalHapticFeedback.current
+    val chatName = chat.name ?: chat.otherUser?.displayName ?: "Unknown"
+    val lastMsg = chat.lastMessage?.content ?: "No messages yet"
+    val unreadText = if (chat.unreadCount > 0) ", ${chat.unreadCount} unread messages" else ""
+    val pinnedText = if (isPinned) ", pinned" else ""
     
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Chat with $chatName, $lastMsg$unreadText$pinnedText"
+                role = Role.Button
+            }
             .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick,
+                onClick = {
+                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onClick()
+                },
+                onLongClick = {
+                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLongClick()
+                },
                 indication = ripple(),
                 interactionSource = remember { MutableInteractionSource() }
             ),

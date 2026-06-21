@@ -18,7 +18,13 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,6 +47,7 @@ fun MessageInputBar(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val focusRequester = remember { FocusRequester() }
     var isExpanded by remember { mutableStateOf(true) }
 
@@ -114,7 +121,10 @@ fun MessageInputBar(
             ) {
                 // Actions Expand Button (The "+" button)
                 IconButton(
-                    onClick = { isExpanded = !isExpanded },
+                    onClick = { 
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        isExpanded = !isExpanded 
+                    },
                     modifier = Modifier.padding(bottom = 4.dp)
                 ) {
                     val rotation by animateFloatAsState(
@@ -123,7 +133,7 @@ fun MessageInputBar(
                     )
                     Icon(
                         imageVector = Icons.Default.Add,
-                        contentDescription = "Toggle actions",
+                        contentDescription = if (isExpanded) "Hide attachment options" else "Show attachment options",
                         modifier = Modifier.graphicsLayer { rotationZ = rotation },
                         tint = MaterialTheme.colorScheme.primary
                     )
@@ -136,18 +146,24 @@ fun MessageInputBar(
                     exit = shrinkHorizontally() + fadeOut()
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { imagePickerLauncher.launch("image/*") }) {
+                        IconButton(onClick = { 
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            imagePickerLauncher.launch("image/*") 
+                        }) {
                             Icon(
                                 imageVector = Icons.Default.Image,
-                                contentDescription = "Gallery",
+                                contentDescription = "Attach image from gallery",
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
                         if (onGifClick != null) {
-                            IconButton(onClick = onGifClick) {
+                            IconButton(onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onGifClick()
+                            }) {
                                 Icon(
                                     imageVector = Icons.Default.Gif,
-                                    contentDescription = "GIF",
+                                    contentDescription = "Attach GIF",
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
@@ -182,7 +198,7 @@ fun MessageInputBar(
                             IconButton(onClick = { /* Emoji Action placeholder */ }) {
                                 Icon(
                                     imageVector = Icons.Default.SentimentSatisfiedAlt,
-                                    contentDescription = "Emoji",
+                                    contentDescription = "Pick emoji",
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -201,6 +217,7 @@ fun MessageInputBar(
                         keyboardActions = KeyboardActions(
                             onSend = {
                                 if (message.isNotEmpty() && !isSending) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     onSend()
                                 }
                             }
@@ -220,7 +237,10 @@ fun MessageInputBar(
                 ) {
                     if (message.isNotEmpty() || isSending) {
                         IconButton(
-                            onClick = onSend,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSend()
+                            },
                             enabled = !isSending
                         ) {
                             if (isSending) {
@@ -257,10 +277,15 @@ private fun ReplyPreview(
     reply: Message,
     onClearReply: () -> Unit
 ) {
+    val senderName = reply.senderId.displayName
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Replying to $senderName: ${reply.content}"
+            },
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     ) {

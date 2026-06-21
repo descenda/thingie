@@ -22,13 +22,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import org.cycb.canvas.data.model.UserSummary
 import org.cycb.canvas.ui.components.NotesRow
+import org.cycb.canvas.ui.components.shimmerEffect
 import org.cycb.canvas.viewmodel.DashboardUiState
 import org.cycb.canvas.viewmodel.DashboardViewModel
 import org.cycb.canvas.viewmodel.ChatsViewModel
@@ -167,10 +174,15 @@ fun DashboardScreen(
                         }
                     }
                     is DashboardUiState.Loading -> {
-                        item {
-                            Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                                CircularWavyProgressIndicator()
-                            }
+                        items(8) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(80.dp)
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .shimmerEffect()
+                            )
                         }
                     }
                     is DashboardUiState.Error -> {
@@ -201,18 +213,31 @@ fun DashboardScreen(
 
 @Composable
 fun OnlineFriendItem(friend: org.cycb.canvas.data.model.User, onClick: (String) -> Unit) {
+    val haptic = LocalHapticFeedback.current
+    val name = friend.displayName ?: friend.username
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(72.dp)
+        modifier = Modifier
+            .width(72.dp)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "$name is online"
+                role = Role.Button
+            }
+            .clickable(
+                onClickLabel = "Message $name"
+            ) {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick(friend.getUserId())
+            }
     ) {
         Box {
             AsyncImage(
                 model = friend.profilePicture ?: "https://ui-avatars.com/api/?name=${friend.username}",
-                contentDescription = friend.username,
+                contentDescription = null, // Handled by Column semantics
                 modifier = Modifier
                     .size(64.dp)
-                    .clip(CircleShape)
-                    .clickable { onClick(friend.getUserId()) },
+                    .clip(CircleShape),
                 contentScale = ContentScale.Crop
             )
             Box(

@@ -324,8 +324,12 @@ fun FloatingToolbarIconButton(
     contentDescription: String,
     isSelected: Boolean
 ) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     IconButton(
-        onClick = onClick,
+        onClick = {
+            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+            onClick()
+        },
         colors = IconButtonDefaults.iconButtonColors(
             containerColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent,
             contentColor = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
