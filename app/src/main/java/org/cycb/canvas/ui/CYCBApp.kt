@@ -31,6 +31,7 @@ import org.cycb.canvas.ui.auth.LoginScreen
 import org.cycb.canvas.ui.auth.SignUpScreen
 import org.cycb.canvas.ui.screens.*
 import org.cycb.canvas.viewmodel.*
+import org.cycb.canvas.ui.components.AccountSwitcherDialog
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -45,6 +46,8 @@ fun CYCBApp(
     val user by authViewModel.user.collectAsState()
     val isLoading by authViewModel.isLoading.collectAsState()
     val navController = rememberNavController()
+    
+    var showAccountSwitcher by remember { mutableStateOf(false) }
 
     LaunchedEffect(initialRoute, chatId, userId, user) {
         if (user != null && initialRoute != null) {
@@ -96,6 +99,19 @@ fun CYCBApp(
 
     Scaffold(
     ) { innerPadding ->
+        if (showAccountSwitcher) {
+            AccountSwitcherDialog(
+                viewModel = authViewModel,
+                onDismiss = { showAccountSwitcher = false },
+                onAddAccount = {
+                    navController.navigate("login")
+                },
+                onViewProfile = { uid ->
+                    navController.navigate("profile/$uid")
+                }
+            )
+        }
+
         Box(modifier = Modifier.fillMaxSize().padding(if (isLandscape) PaddingValues(0.dp) else innerPadding)) {
             Row(modifier = Modifier.fillMaxSize()) {
                 // Discord-ish Sidebar for Landscape
@@ -133,6 +149,7 @@ fun CYCBApp(
                                     chatsViewModel = chatsViewModel,
                                     friendsViewModel = friendsViewModel,
                                     navController = navController,
+                                    onAccountSwitcherClick = { showAccountSwitcher = true },
                                     isSidebar = true
                                 )
                             }
@@ -204,7 +221,8 @@ fun CYCBApp(
                                     user = user,
                                     chatsViewModel = chatsViewModel,
                                     friendsViewModel = friendsViewModel,
-                                    navController = navController
+                                    navController = navController,
+                                    onAccountSwitcherClick = { showAccountSwitcher = true }
                                 )
                             }
                         }
@@ -278,7 +296,8 @@ fun CYCBApp(
                                     navController.navigate("login") { popUpTo("home") { inclusive = true } }
                                 },
                                 onNavigateToThemePicker = { navController.navigate("theme_picker") },
-                                onNavigateToUpdate = { navController.navigate("update_screen") }
+                                onNavigateToUpdate = { navController.navigate("update_screen") },
+                                onAccountSwitcherClick = { showAccountSwitcher = true }
                             )
                         }
                         composable("theme_picker") {
@@ -495,6 +514,7 @@ fun MainScreensWithSwipe(
     chatsViewModel: ChatsViewModel,
     friendsViewModel: FriendsViewModel,
     navController: androidx.navigation.NavHostController,
+    onAccountSwitcherClick: () -> Unit = {},
     isSidebar: Boolean = false
 ) {
     androidx.compose.foundation.pager.HorizontalPager(
@@ -525,6 +545,7 @@ fun MainScreensWithSwipe(
                     onSearchClick = { navController.navigate("search_users") },
                     onSettingsClick = { navController.navigate("settings") },
                     onProfileClick = { user?.id?.let { uid -> navController.navigate("profile/$uid") } },
+                    onAccountSwitcherClick = onAccountSwitcherClick,
                     onNewGroupClick = { navController.navigate("create_group") },
                     onPublicChatsClick = { navController.navigate("public_chats") },
                     onMoreClick = { navController.navigate("settings") },

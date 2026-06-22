@@ -7,12 +7,10 @@ import org.cycb.canvas.data.api.RetrofitClient
 import org.cycb.canvas.data.model.LoginRequest
 import org.cycb.canvas.data.model.User
 import org.cycb.canvas.data.socket.SocketManager
+import org.cycb.canvas.data.storage.StoredAccount
 import org.cycb.canvas.data.storage.TokenManager
 import com.google.firebase.messaging.FirebaseMessaging
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -28,19 +26,19 @@ class AuthViewModel(context: Context) : ViewModel() {
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    init {
+    val accounts: StateFlow<List<StoredAccount>> = tokenManager.accounts
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    init {
         checkSavedAuth()
     }
 
     private fun checkSavedAuth() {
         viewModelScope.launch {
             try {
-
                 val token = tokenManager.token.first()
                 android.util.Log.d("AuthViewModel", "Checking saved auth, token: ${token?.take(20)}...")
                 if (!token.isNullOrEmpty()) {
-
                     RetrofitClient.setToken(token)
                     try {
                         android.util.Log.d("AuthViewModel", "Fetching current user...")
@@ -50,12 +48,15 @@ class AuthViewModel(context: Context) : ViewModel() {
                         RetrofitClient.setCurrentUserId(user.getUserId())
 
                         SocketManager.getInstance().connect(token)
-
                         registerFCMToken()
                     } catch (e: Exception) {
-
                         android.util.Log.e("AuthViewModel", "Failed to fetch user: ${e.message}", e)
-                        tokenManager.clearToken()
+                        // If token is invalid, but we have multiple accounts, maybe we shouldn't clear all?
+                        // For now, if active token fails, we clear it from that specific account
+                        val activeUserId = tokenManager.activeUserId.first()
+                        if (activeUserId != null) {
+                            tokenManager.removeAccount(activeUserId)
+                        }
                         RetrofitClient.setToken(null)
                     }
                 }
@@ -76,20 +77,78 @@ class AuthViewModel(context: Context) : ViewModel() {
                 )
 
                 android.util.Log.d("AuthViewModel", "Login successful: ${response.user.getUserId()}, ${response.user.username}")
-                tokenManager.saveToken(response.token, response.user.getUserId())
+                
+                val account = StoredAccount(
+                    userId = response.user.getUserId(),
+                    token = response.token,
+                    username = response.user.username,
+                    displayName = response.user.displayName,
+                    profilePicture = response.user.profilePicture
+                )
+                tokenManager.saveAccount(account)
+                
                 RetrofitClient.setToken(response.token)
                 RetrofitClient.setCurrentUserId(response.user.getUserId())
                 _user.value = response.user
-                android.util.Log.d("AuthViewModel", "User state set: ${_user.value?.id}")
-
+                
                 SocketManager.getInstance().connect(response.token)
-
+                registerFCMToken()
                 _uiState.value = AuthUiState.Success
             } catch (e: Exception) {
                 android.util.Log.e("AuthViewModel", "Login failed: ${e.message}", e)
                 _uiState.value = AuthUiState.Error(
                     e.message ?: "Login failed. Please try again."
                 )
+            }
+        }
+    }
+
+    fun switchAccount(userId: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            tokenManager.switchAccount(userId)
+            val token = tokenManager.token.first()
+            if (token != null) {
+                RetrofitClient.setToken(token)
+                try {
+                    val user = RetrofitClient.apiService.getCurrentUser()
+                    _user.value = user
+                    RetrofitClient.setCurrentUserId(user.getUserId())
+                    SocketManager.getInstance().disconnect()
+                    SocketManager.getInstance().connect(token)
+                    registerFCMToken()
+                } catch (e: Exception) {
+                    android.util.Log.e("AuthViewModel", "Failed to switch to user $userId: ${e.message}")
+                }
+            }
+            _isLoading.value = false
+        }
+    }
+
+    fun removeAccount(userId: String) {
+        viewModelScope.launch {
+            tokenManager.removeAccount(userId)
+            if (tokenManager.activeUserId.first() == null) {
+                _user.value = null
+                RetrofitClient.setToken(null)
+                RetrofitClient.setCurrentUserId(null)
+                SocketManager.getInstance().disconnect()
+            } else {
+                // If we removed the active account, switchAccount logic in tokenManager 
+                // already updated the active one, we just need to refresh UI
+                val newToken = tokenManager.token.first()
+                RetrofitClient.setToken(newToken)
+                if (newToken != null) {
+                    try {
+                        val user = RetrofitClient.apiService.getCurrentUser()
+                        _user.value = user
+                        RetrofitClient.setCurrentUserId(user.getUserId())
+                        SocketManager.getInstance().disconnect()
+                        SocketManager.getInstance().connect(newToken)
+                    } catch (e: Exception) {
+                        _user.value = null
+                    }
+                }
             }
         }
     }
@@ -107,15 +166,21 @@ class AuthViewModel(context: Context) : ViewModel() {
                     )
                 )
 
-                tokenManager.saveToken(response.token, response.user.getUserId())
+                val account = StoredAccount(
+                    userId = response.user.getUserId(),
+                    token = response.token,
+                    username = response.user.username,
+                    displayName = response.user.displayName,
+                    profilePicture = response.user.profilePicture
+                )
+                tokenManager.saveAccount(account)
+                
                 RetrofitClient.setToken(response.token)
                 RetrofitClient.setCurrentUserId(response.user.getUserId())
                 _user.value = response.user
 
                 SocketManager.getInstance().connect(response.token)
-
                 registerFCMToken()
-
                 _uiState.value = AuthUiState.Success
             } catch (e: Exception) {
                 android.util.Log.e("AuthViewModel", "Registration failed", e)
@@ -123,8 +188,6 @@ class AuthViewModel(context: Context) : ViewModel() {
                     e is retrofit2.HttpException -> {
                         try {
                             val errorBody = e.response()?.errorBody()?.string()
-                            android.util.Log.e("AuthViewModel", "Error body: $errorBody")
-
                             val jsonError = org.json.JSONObject(errorBody ?: "{}")
                             jsonError.optString("error", "Registration failed")
                         } catch (parseError: Exception) {
@@ -142,17 +205,7 @@ class AuthViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             try {
                 val token = FirebaseMessaging.getInstance().token.await()
-                android.util.Log.d("AuthViewModel", "FCM Token: $token")
-
-                val response = RetrofitClient.apiService.registerFCMToken(
-                    mapOf("fcmToken" to token)
-                )
-
-                if (response.isSuccessful) {
-                    android.util.Log.d("AuthViewModel", "FCM token registered successfully")
-                } else {
-                    android.util.Log.e("AuthViewModel", "Failed to register FCM token: ${response.code()}")
-                }
+                RetrofitClient.apiService.registerFCMToken(mapOf("fcmToken" to token))
             } catch (e: Exception) {
                 android.util.Log.e("AuthViewModel", "Error registering FCM token", e)
             }
@@ -166,10 +219,20 @@ class AuthViewModel(context: Context) : ViewModel() {
     fun refreshUser() {
         viewModelScope.launch {
             try {
-                android.util.Log.d("AuthViewModel", "Refreshing user data...")
                 val user = RetrofitClient.apiService.getCurrentUser()
-                android.util.Log.d("AuthViewModel", "User refreshed: ${user.id}, ${user.username}")
                 _user.value = user
+                
+                // Update stored account info
+                val currentToken = tokenManager.token.first()
+                if (currentToken != null) {
+                    tokenManager.saveAccount(StoredAccount(
+                        userId = user.getUserId(),
+                        token = currentToken,
+                        username = user.username,
+                        displayName = user.displayName,
+                        profilePicture = user.profilePicture
+                    ))
+                }
             } catch (e: Exception) {
                 android.util.Log.e("AuthViewModel", "Failed to refresh user: ${e.message}", e)
             }
@@ -177,6 +240,15 @@ class AuthViewModel(context: Context) : ViewModel() {
     }
 
     fun logout() {
+        viewModelScope.launch {
+            val activeId = tokenManager.activeUserId.first()
+            if (activeId != null) {
+                removeAccount(activeId)
+            }
+        }
+    }
+    
+    fun logoutAll() {
         viewModelScope.launch {
             tokenManager.clearToken()
             RetrofitClient.setToken(null)

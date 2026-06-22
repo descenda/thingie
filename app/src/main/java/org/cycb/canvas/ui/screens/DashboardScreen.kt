@@ -52,6 +52,7 @@ fun DashboardScreen(
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onProfileClick: () -> Unit = {},
+    onAccountSwitcherClick: () -> Unit = {},
     onNewGroupClick: () -> Unit,
     onPublicChatsClick: () -> Unit,
     onMoreClick: () -> Unit,
@@ -75,7 +76,7 @@ fun DashboardScreen(
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = onProfileClick) {
+                        IconButton(onClick = onAccountSwitcherClick) {
                             ProfilePicture(
                                 imageUrl = currentUser?.profilePicture ?: "https://ui-avatars.com/api/?name=${currentUser?.username}",
                                 displayName = currentUser?.displayName ?: currentUser?.username ?: "Me",

@@ -29,6 +29,7 @@ fun SettingsScreen(
     onLogout: () -> Unit,
     onNavigateToThemePicker: () -> Unit = {},
     onNavigateToUpdate: () -> Unit = {},
+    onAccountSwitcherClick: () -> Unit = {},
     viewModel: org.cycb.canvas.viewmodel.SettingsViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -113,6 +114,17 @@ fun SettingsScreen(
                 .padding(padding),
             contentPadding = PaddingValues(bottom = 16.dp)
         ) {
+            // --- Accounts Section ---
+            item { SettingsCategoryHeader("Multi-Account") }
+            item {
+                SettingsClickableCard(
+                    title = "Switch or Add Account",
+                    subtitle = "Manage multiple profiles",
+                    icon = Icons.Default.People,
+                    onClick = onAccountSwitcherClick
+                )
+            }
+
             // --- Account Category ---
             item { SettingsCategoryHeader("Account") }
             item {
