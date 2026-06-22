@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import org.cycb.canvas.data.model.UserSummary
+import org.cycb.canvas.ui.components.ProfilePicture
 import org.cycb.canvas.ui.components.NotesRow
 import org.cycb.canvas.ui.components.shimmerEffect
 import org.cycb.canvas.viewmodel.DashboardUiState
@@ -50,9 +51,11 @@ fun DashboardScreen(
     onUserClick: (String) -> Unit,
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    onProfileClick: () -> Unit = {},
     onNewGroupClick: () -> Unit,
     onPublicChatsClick: () -> Unit,
-    onMoreClick: () -> Unit
+    onMoreClick: () -> Unit,
+    isSidebar: Boolean = false
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
@@ -62,27 +65,38 @@ fun DashboardScreen(
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                title = {
-                    Text(
-                        "Home",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                actions = {
-                    IconButton(onClick = onSearchClick) {
-                        Icon(Icons.Default.Search, "Search")
-                    }
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Default.Settings, "Settings")
-                    }
-                },
-                colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                windowInsets = WindowInsets(0, 0, 0, 0)
-            )
+            if (!isSidebar) {
+                TopAppBar(
+                    title = {
+                        Text(
+                            "Home",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onProfileClick) {
+                            ProfilePicture(
+                                imageUrl = currentUser?.profilePicture ?: "https://ui-avatars.com/api/?name=${currentUser?.username}",
+                                displayName = currentUser?.displayName ?: currentUser?.username ?: "Me",
+                                size = 32.dp
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = onSearchClick) {
+                            Icon(Icons.Default.Search, "Search")
+                        }
+                        IconButton(onClick = onSettingsClick) {
+                            Icon(Icons.Default.Settings, "Settings")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    windowInsets = WindowInsets(0, 0, 0, 0)
+                )
+            }
         }
     ) { paddingValues ->
         PullToRefreshBox(
@@ -92,15 +106,15 @@ fun DashboardScreen(
         ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 120.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+                contentPadding = PaddingValues(bottom = if (isSidebar) 16.dp else 120.dp, top = if (isSidebar) 8.dp else 0.dp),
+                verticalArrangement = Arrangement.spacedBy(if (isSidebar) 16.dp else 24.dp)
             ) {
                 when (val state = uiState) {
                     is DashboardUiState.Success -> {
                         // Notes Section
                         item {
-                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                PaddingTitle("Thoughts")
+                            Column(verticalArrangement = Arrangement.spacedBy(if (isSidebar) 8.dp else 12.dp)) {
+                                PaddingTitle("Thoughts", isSidebar)
                                 NotesRow(
                                     currentUser = currentUser,
                                     notes = state.notes,
@@ -113,11 +127,11 @@ fun DashboardScreen(
                         // Online Friends Section
                         if (state.onlineFriends.isNotEmpty()) {
                             item {
-                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    PaddingTitle("Online Now")
+                                Column(verticalArrangement = Arrangement.spacedBy(if (isSidebar) 8.dp else 12.dp)) {
+                                    PaddingTitle("Online Now", isSidebar)
                                     LazyRow(
                                         contentPadding = PaddingValues(horizontal = 16.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(if (isSidebar) 12.dp else 16.dp)
                                     ) {
                                         items(state.onlineFriends) { friend ->
                                             OnlineFriendItem(friend, onUserClick)
@@ -129,8 +143,8 @@ fun DashboardScreen(
 
                         // Quick Actions - Redesigned as Chips/Buttons for Google Chat feel
                         item {
-                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                PaddingTitle("Quick Actions")
+                            Column(verticalArrangement = Arrangement.spacedBy(if (isSidebar) 8.dp else 12.dp)) {
+                                PaddingTitle("Quick Actions", isSidebar)
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -149,19 +163,21 @@ fun DashboardScreen(
                                         modifier = Modifier.weight(1f),
                                         onClick = onPublicChatsClick
                                     )
-                                    QuickActionChip(
-                                        text = "Settings",
-                                        icon = Icons.Default.Settings,
-                                        modifier = Modifier.weight(1f),
-                                        onClick = onMoreClick
-                                    )
+                                    if (!isSidebar) {
+                                        QuickActionChip(
+                                            text = "Settings",
+                                            icon = Icons.Default.Settings,
+                                            modifier = Modifier.weight(1f),
+                                            onClick = onMoreClick
+                                        )
+                                    }
                                 }
                             }
                         }
 
                         // Recent Chats
                         item {
-                            PaddingTitle("Recent Chats")
+                            PaddingTitle("Recent Chats", isSidebar)
                         }
 
                         items(state.recentChats.take(5)) { chat ->
@@ -318,10 +334,10 @@ fun NoteEditDialog(
 }
 
 @Composable
-fun PaddingTitle(text: String) {
+fun PaddingTitle(text: String, isSidebar: Boolean = false) {
     Text(
         text = text,
-        style = MaterialTheme.typography.titleMedium,
+        style = if (isSidebar) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold,
         modifier = Modifier.padding(horizontal = 16.dp),
         color = MaterialTheme.colorScheme.primary

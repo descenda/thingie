@@ -171,6 +171,9 @@ class ChatRoomViewModel : ViewModel() {
     private val _chatMembers = MutableStateFlow<List<org.cycb.canvas.data.model.User>>(emptyList())
     val chatMembers: StateFlow<List<org.cycb.canvas.data.model.User>> = _chatMembers.asStateFlow()
 
+    private val _chat = MutableStateFlow<org.cycb.canvas.data.model.Chat?>(null)
+    val chat: StateFlow<org.cycb.canvas.data.model.Chat?> = _chat.asStateFlow()
+
     private val _chatBackground = MutableStateFlow<org.cycb.canvas.data.model.ChatBackground?>(null)
     val chatBackground: StateFlow<org.cycb.canvas.data.model.ChatBackground?> = _chatBackground.asStateFlow()
 
@@ -232,8 +235,23 @@ class ChatRoomViewModel : ViewModel() {
             try {
                 val response = RetrofitClient.apiService.getChatMembers(chatId)
                 if (response.success) {
-                    _chatMembers.value = response.members
-                    val bg = response.chat.customization?.background
+                    val members = response.members
+                    _chatMembers.value = members
+                    val chatInfo = response.chat
+                    
+                    val currentUserId = RetrofitClient.getCurrentUserId()
+                    val otherUser = if (chatInfo.type == "private") {
+                        members.find { it.getUserId() != currentUserId }
+                    } else null
+
+                    _chat.value = org.cycb.canvas.data.model.Chat(
+                        id = chatInfo.id,
+                        type = chatInfo.type,
+                        name = chatInfo.name,
+                        avatar = chatInfo.avatar,
+                        otherUser = otherUser
+                    )
+                    val bg = chatInfo.customization?.background
                     android.util.Log.d("ChatRoomVM", "Loaded chat members. Background: $bg")
                     _chatBackground.value = bg
                 }

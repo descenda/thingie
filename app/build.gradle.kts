@@ -114,6 +114,10 @@ dependencies {
 
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
+    implementation("androidx.biometric:biometric:1.2.0-alpha05")
+
+    implementation("org.jsoup:jsoup:1.17.2")
+
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
 
     implementation("io.agora.rtc:voice-sdk:4.6.0")

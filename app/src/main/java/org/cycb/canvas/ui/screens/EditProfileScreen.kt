@@ -85,7 +85,13 @@ fun EditProfileScreen(
         modifier = Modifier.imePadding(),
         topBar = {
             TopAppBar(
-                title = { Text("Edit Profile") },
+                title = { 
+                    Text(
+                        "Edit Profile",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    ) 
+                },
                 navigationIcon = {
                     TextButton(onClick = onCancelClick) {
                         Text(

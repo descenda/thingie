@@ -35,6 +35,9 @@ class ChatsViewModel(application: android.app.Application) : androidx.lifecycle.
     val pinnedChatIds: StateFlow<Set<String>> = chatPreferences.pinnedChatIds
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptySet())
 
+    val folders: StateFlow<List<org.cycb.canvas.data.model.ChatFolder>> = chatPreferences.folders
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
+
     init {
         loadChats()
         setupSocketListeners()
@@ -211,6 +214,34 @@ class ChatsViewModel(application: android.app.Application) : androidx.lifecycle.
     fun isChatPinned(chatId: String): kotlinx.coroutines.flow.Flow<Boolean> {
         return chatPreferences.pinnedChatIds.map { pinnedIds ->
             pinnedIds.contains(chatId)
+        }
+    }
+
+    fun createFolder(name: String, chatIds: Set<String> = emptySet()) {
+        viewModelScope.launch {
+            val currentFolders = folders.value
+            val newFolder = org.cycb.canvas.data.model.ChatFolder(
+                id = java.util.UUID.randomUUID().toString(),
+                name = name,
+                chatIds = chatIds
+            )
+            chatPreferences.saveFolders(currentFolders + newFolder)
+        }
+    }
+
+    fun deleteFolder(folderId: String) {
+        viewModelScope.launch {
+            val updatedFolders = folders.value.filter { it.id != folderId }
+            chatPreferences.saveFolders(updatedFolders)
+        }
+    }
+
+    fun updateFolder(folder: org.cycb.canvas.data.model.ChatFolder) {
+        viewModelScope.launch {
+            val updatedFolders = folders.value.map {
+                if (it.id == folder.id) folder else it
+            }
+            chatPreferences.saveFolders(updatedFolders)
         }
     }
 }

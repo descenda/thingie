@@ -35,6 +35,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -63,6 +65,7 @@ fun ChatRoomScreen(
     chat: Chat?,
     viewModel: ChatRoomViewModel,
     voiceCallViewModel: org.cycb.canvas.viewmodel.VoiceCallViewModel,
+    linkPreviewViewModel: org.cycb.canvas.viewmodel.LinkPreviewViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     currentUserId: String,
     currentUsername: String,
     onBackClick: () -> Unit,
@@ -78,8 +81,14 @@ fun ChatRoomScreen(
     val chatMembers by viewModel.chatMembers.collectAsState()
     val hasActiveCall by viewModel.hasActiveCall.collectAsState()
     val chatBackground by viewModel.chatBackground.collectAsState()
+    val chatFromViewModel by viewModel.chat.collectAsState()
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+
+    val actualChat = chat ?: chatFromViewModel
+
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     var selectedImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
     var isUploadingImage by remember { mutableStateOf(false) }
@@ -181,7 +190,7 @@ fun ChatRoomScreen(
     Column(modifier = Modifier.fillMaxSize()) {
 
         ChatRoomTopBar(
-            chat = chat,
+            chat = actualChat,
             chatMembers = chatMembers,
             hasActiveCall = hasActiveCall != null,
             onBackClick = onBackClick,
@@ -193,7 +202,7 @@ fun ChatRoomScreen(
                     return@ChatRoomTopBar
                 }
 
-                val isGroupChat = chat?.type == "group"
+                val isGroupChat = actualChat?.type == "group"
                 val activeCallInfo = hasActiveCall
 
                 val callAction = {
@@ -213,7 +222,7 @@ fun ChatRoomScreen(
 
                         voiceCallViewModel.initiateCall(
                             chatId = chatId,
-                            chatName = chat?.name ?: "Chat",
+                            chatName = actualChat?.name ?: "Chat",
                             callerId = currentUserId,
                             callerName = currentUsername,
                             isGroupChat = isGroupChat
@@ -235,12 +244,13 @@ fun ChatRoomScreen(
                 }
             },
             onTitleClick = {
-                if (chat?.type == "group") {
+                if (actualChat?.type == "group") {
                     onGroupInfoClick()
                 } else {
-                    chat?.otherUser?.getUserId()?.let { onProfileClick(it) }
+                    actualChat?.otherUser?.getUserId()?.let { onProfileClick(it) }
                 }
-            }
+            },
+            isLandscape = isLandscape
         )
 
         Box(
@@ -305,9 +315,10 @@ fun ChatRoomScreen(
                     MessagesList(
                         messages = state.messages,
                         currentUserId = currentUserId,
-                        isGroupChat = chat?.type == "group",
+                        isGroupChat = actualChat?.type == "group",
                         listState = listState,
                         viewModel = viewModel,
+                        linkPreviewViewModel = linkPreviewViewModel,
                         typingUsers = typingUsers.toList(),
                         autoPlayGifs = autoPlayGifs,
                         modifier = Modifier.fillMaxSize(),
@@ -329,7 +340,7 @@ fun ChatRoomScreen(
             currentCall?.let { call ->
                 if (call.chatId == chatId) {
                     org.cycb.canvas.ui.components.VoiceCallOverlay(
-                        chatName = chat?.name ?: "Voice Call",
+                        chatName = actualChat?.name ?: "Voice Call",
                         participants = call.participants,
                         isMuted = isMuted,
                         isSpeakerOn = isSpeakerOn,
@@ -395,6 +406,11 @@ fun ChatRoomScreen(
                 selectedImageUri = selectedImageUri,
                 onRemoveImage = { selectedImageUri = null },
                 onGifClick = { showGifPicker = true },
+                onScheduleMessage = { time ->
+                    val date = java.util.Date(time)
+                    val formatted = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()).format(date)
+                    android.widget.Toast.makeText(context, "Message scheduled for $formatted", android.widget.Toast.LENGTH_LONG).show()
+                },
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
 
@@ -473,21 +489,22 @@ private fun ChatRoomTopBar(
     onBackClick: () -> Unit,
     onMenuClick: () -> Unit,
     onVoiceCallClick: () -> Unit,
-    onTitleClick: () -> Unit = {}
+    onTitleClick: () -> Unit = {},
+    isLandscape: Boolean = false
 ) {
     val isGroup = chat?.type == "group"
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 2.dp,
-        tonalElevation = 3.dp
+        shadowElevation = if (isLandscape) 1.dp else 2.dp,
+        tonalElevation = if (isLandscape) 1.dp else 3.dp
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(top = 8.dp, bottom = 12.dp)
+                .padding(top = if (isLandscape) 4.dp else 8.dp, bottom = if (isLandscape) 4.dp else 12.dp)
         ) {
 
             Column(
@@ -497,66 +514,113 @@ private fun ChatRoomTopBar(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (isGroup && chatMembers.isNotEmpty()) {
-
-                    AnimatedAvatarCluster(
-                        participants = chatMembers,
-                        groupName = chat?.name ?: "Group Chat",
-                        onClusterClick = onTitleClick,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                    )
+                    if (isLandscape) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.clickable { onTitleClick() }.padding(vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = chat?.name ?: "Group Chat",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "${chatMembers.size} members",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        AnimatedAvatarCluster(
+                            participants = chatMembers,
+                            groupName = chat?.name ?: "Group Chat",
+                            onClusterClick = onTitleClick,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                        )
+                    }
                 } else if (isGroup && chatMembers.isEmpty()) {
 
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onTitleClick() }
-                            .padding(vertical = 8.dp),
+                            .padding(vertical = if (isLandscape) 4.dp else 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         LoadingIndicator(
-                            modifier = Modifier.size(32.dp),
+                            modifier = Modifier.size(if (isLandscape) 20.dp else 32.dp),
                             color = MaterialTheme.colorScheme.primary
                         )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = "Loading...",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        if (!isLandscape) {
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = "Loading...",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 } else {
-
+                    // Private Chat
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onTitleClick() }
-                            .padding(vertical = 8.dp),
+                            .padding(vertical = if (isLandscape) 0.dp else 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        ProfilePicture(
-                            imageUrl = chat?.otherUser?.profilePicture,
-                            displayName = chat?.name ?: chat?.otherUser?.displayName ?: "Chat",
-                            size = 56.dp
-                        )
+                        if (!isLandscape) {
+                            ProfilePicture(
+                                imageUrl = chat?.otherUser?.profilePicture ?: chat?.avatar,
+                                displayName = chat?.name ?: chat?.otherUser?.displayName ?: "Chat",
+                                size = 56.dp
+                            )
+                            Spacer(Modifier.height(8.dp))
+                        }
 
-                        Spacer(Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (isLandscape) {
+                                ProfilePicture(
+                                    imageUrl = chat?.otherUser?.profilePicture ?: chat?.avatar,
+                                    displayName = chat?.name ?: chat?.otherUser?.displayName ?: "Chat",
+                                    size = 28.dp
+                                )
+                                Spacer(Modifier.width(8.dp))
+                            }
+                            Text(
+                                text = chat?.name ?: chat?.otherUser?.displayName ?: "Chat",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                            if (isLandscape && chat?.otherUser != null) {
+                                Spacer(Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .background(
+                                            if (chat.otherUser.isOnline) Color(0xFF4CAF50) else Color.Gray,
+                                            CircleShape
+                                        )
+                                )
+                            }
+                        }
 
-                        Text(
-                            text = chat?.name ?: chat?.otherUser?.displayName ?: "Chat",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-
-                        Text(
-                            text = if (chat?.otherUser?.isOnline == true) "Online" else "Offline",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (chat?.otherUser?.isOnline == true)
-                                MaterialTheme.colorScheme.tertiary
-                            else
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        if (!isLandscape) {
+                            Text(
+                                text = if (chat?.otherUser?.isOnline == true) "Online" else "Offline",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (chat?.otherUser?.isOnline == true)
+                                    MaterialTheme.colorScheme.tertiary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
@@ -636,6 +700,7 @@ fun MessagesList(
     isGroupChat: Boolean,
     listState: androidx.compose.foundation.lazy.LazyListState,
     viewModel: ChatRoomViewModel,
+    linkPreviewViewModel: org.cycb.canvas.viewmodel.LinkPreviewViewModel,
     typingUsers: List<org.cycb.canvas.data.socket.TypingUser> = emptyList(),
     autoPlayGifs: Boolean = true,
     modifier: Modifier = Modifier,
@@ -776,6 +841,7 @@ fun MessagesList(
                                     isLastInCluster = isLastInCluster,
                                     isGroupChat = isGroupChat,
                                     autoPlayGifs = autoPlayGifs,
+                                    linkPreviewViewModel = linkPreviewViewModel,
                                     onReactionClick = { emoji ->
                                         viewModel.reactToMessage(message._id, emoji)
                                     },
@@ -800,6 +866,7 @@ fun MessagesList(
                                 isLastInCluster = isLastInCluster,
                                 isGroupChat = isGroupChat,
                                 autoPlayGifs = autoPlayGifs,
+                                linkPreviewViewModel = linkPreviewViewModel,
                                 onReactionClick = { emoji ->
                                     viewModel.reactToMessage(message._id, emoji)
                                 },
@@ -830,6 +897,7 @@ fun MessageBubble(
     isLastInCluster: Boolean = true,
     isGroupChat: Boolean = false,
     autoPlayGifs: Boolean = true,
+    linkPreviewViewModel: org.cycb.canvas.viewmodel.LinkPreviewViewModel,
     onReactionClick: (String) -> Unit = {},
     onLongPress: () -> Unit = {},
     onReply: () -> Unit = {},
@@ -1092,16 +1160,38 @@ fun MessageBubble(
                             )
                         }
                         else -> {
+                            Column {
+                                androidx.compose.foundation.text.selection.SelectionContainer {
+                                    Text(
+                                        text = message.content,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (isSent)
+                                            MaterialTheme.colorScheme.onPrimary
+                                        else
+                                            MaterialTheme.colorScheme.onSurfaceVariant,
+                                        lineHeight = 20.sp
+                                    )
+                                }
 
-                            Text(
-                                text = message.content,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (isSent)
-                                    MaterialTheme.colorScheme.onPrimary
-                                else
-                                    MaterialTheme.colorScheme.onSurfaceVariant,
-                                lineHeight = 20.sp
-                            )
+                                val links = remember(message.content) {
+                                    org.cycb.canvas.utils.LinkParser.extractLinks(message.content)
+                                }
+
+                                if (links.isNotEmpty()) {
+                                    val firstLink = links[0]
+                                    val metadataCache by linkPreviewViewModel.metadataCache.collectAsState()
+                                    val metadata = metadataCache[firstLink]
+
+                                    LaunchedEffect(firstLink) {
+                                        linkPreviewViewModel.fetchMetadata(firstLink)
+                                    }
+
+                                    metadata?.let {
+                                        Spacer(Modifier.height(8.dp))
+                                        org.cycb.canvas.ui.components.LinkPreview(metadata = it)
+                                    }
+                                }
+                            }
                         }
                     }
 

@@ -47,11 +47,13 @@ fun SettingsScreen(
     val compactMode by viewModel.compactMode.collectAsState()
     val selectedTheme by viewModel.selectedTheme.collectAsState()
     val highContrast by viewModel.highContrast.collectAsState()
+    val amoledMode by viewModel.amoledMode.collectAsState()
     val largeText by viewModel.largeText.collectAsState()
 
     val readReceipts by viewModel.readReceipts.collectAsState()
     val typingIndicator by viewModel.typingIndicator.collectAsState()
     val lastSeenVisible by viewModel.lastSeenVisible.collectAsState()
+    val biometricLock by viewModel.biometricLock.collectAsState()
     val profilePhotoVisible by viewModel.profilePhotoVisible.collectAsState()
 
     val autoDownloadMedia by viewModel.autoDownloadMedia.collectAsState()
@@ -93,7 +95,7 @@ fun SettingsScreen(
                 title = {
                     Text(
                         "Settings",
-                        style = MaterialTheme.typography.headlineMedium,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                 },
@@ -167,6 +169,17 @@ fun SettingsScreen(
                     onCheckedChange = { viewModel.setDynamicColors(it) },
                     icon = Icons.Default.Colorize
                 )
+            }
+            if (darkMode) {
+                item {
+                    SettingsSwitchCard(
+                        title = "AMOLED Mode",
+                        subtitle = "Pure black background for OLED screens",
+                        checked = amoledMode,
+                        onCheckedChange = { viewModel.setAmoledMode(it) },
+                        icon = Icons.Default.BrightnessLow
+                    )
+                }
             }
             item {
                 SettingsSwitchCard(
@@ -276,6 +289,15 @@ fun SettingsScreen(
                     checked = lastSeenVisible,
                     onCheckedChange = { viewModel.setLastSeenVisible(it) },
                     icon = Icons.Default.Visibility
+                )
+            }
+            item {
+                SettingsSwitchCard(
+                    title = "App Lock",
+                    subtitle = "Use biometrics to unlock app",
+                    checked = biometricLock,
+                    onCheckedChange = { viewModel.setBiometricLock(it) },
+                    icon = Icons.Default.Fingerprint
                 )
             }
 

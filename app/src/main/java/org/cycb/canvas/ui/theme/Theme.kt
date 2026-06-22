@@ -101,6 +101,7 @@ fun CYCBChatTheme(
     val dynamicColors by settingsViewModel.dynamicColors.collectAsState()
     val selectedThemeName by settingsViewModel.selectedTheme.collectAsState()
     val highContrast by settingsViewModel.highContrast.collectAsState()
+    val amoledMode by settingsViewModel.amoledMode.collectAsState()
     val largeText by settingsViewModel.largeText.collectAsState()
 
     val darkTheme = darkMode
@@ -125,6 +126,17 @@ fun CYCBChatTheme(
             onPrimary = if (darkTheme) Color(0xFF000000) else Color(0xFFFFFFFF),
             onSurface = if (darkTheme) Color(0xFFFFFFFF) else Color(0xFF000000),
             onBackground = if (darkTheme) Color(0xFFFFFFFF) else Color(0xFF000000)
+        )
+    }
+
+    if (amoledMode && darkTheme) {
+        colorScheme = colorScheme.copy(
+            surface = Color.Black,
+            background = Color.Black,
+            surfaceVariant = Color.Black,
+            surfaceContainer = Color.Black,
+            surfaceContainerHigh = Color(0xFF111111),
+            surfaceContainerHighest = Color(0xFF222222)
         )
     }
     

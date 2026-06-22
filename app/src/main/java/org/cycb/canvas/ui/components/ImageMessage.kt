@@ -215,7 +215,8 @@ fun ImageViewerDialog(
 fun ImagePreview(
     imageUri: android.net.Uri,
     onRemove: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isCompact: Boolean = false
 ) {
     var isRemovePressed by remember { mutableStateOf(false) }
 
@@ -248,15 +249,15 @@ fun ImagePreview(
         Surface(
             modifier = modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            shape = RoundedCornerShape(16.dp),
+                .padding(horizontal = if (isCompact) 8.dp else 16.dp, vertical = if (isCompact) 4.dp else 8.dp),
+            shape = RoundedCornerShape(if (isCompact) 12.dp else 16.dp),
             color = MaterialTheme.colorScheme.surfaceVariant,
-            shadowElevation = 4.dp
+            shadowElevation = if (isCompact) 2.dp else 4.dp
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
+                    .padding(if (isCompact) 8.dp else 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -268,8 +269,8 @@ fun ImagePreview(
                         .build(),
                     contentDescription = "Selected image",
                     modifier = Modifier
-                        .size(80.dp)
-                        .clip(RoundedCornerShape(12.dp)),
+                        .size(if (isCompact) 48.dp else 80.dp)
+                        .clip(RoundedCornerShape(8.dp)),
                     contentScale = ContentScale.Crop
                 )
 
@@ -278,14 +279,16 @@ fun ImagePreview(
                 ) {
                     Text(
                         text = "Image ready to send",
-                        style = MaterialTheme.typography.titleSmall,
+                        style = if (isCompact) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Text(
-                        text = "Tap send to share",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
+                    if (!isCompact) {
+                        Text(
+                            text = "Tap send to share",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
                 }
 
                 IconButton(

@@ -36,7 +36,10 @@ class SettingsPreferences(private val context: Context) {
         val AUTO_PLAY_GIFS = booleanPreferencesKey("auto_play_gifs")
         val ENTER_TO_SEND = booleanPreferencesKey("enter_to_send")
 
+        val BIOMETRIC_LOCK = booleanPreferencesKey("biometric_lock")
+
         val HIGH_CONTRAST = booleanPreferencesKey("high_contrast")
+        val AMOLED_MODE = booleanPreferencesKey("amoled_mode")
         val LARGE_TEXT = booleanPreferencesKey("large_text")
     }
 
@@ -88,8 +91,14 @@ class SettingsPreferences(private val context: Context) {
     val enterToSend: Flow<Boolean> = context.settingsDataStore.data
         .map { it[ENTER_TO_SEND] ?: false }
 
+    val biometricLock: Flow<Boolean> = context.settingsDataStore.data
+        .map { it[BIOMETRIC_LOCK] ?: false }
+
     val highContrast: Flow<Boolean> = context.settingsDataStore.data
         .map { it[HIGH_CONTRAST] ?: false }
+
+    val amoledMode: Flow<Boolean> = context.settingsDataStore.data
+        .map { it[AMOLED_MODE] ?: false }
 
     val largeText: Flow<Boolean> = context.settingsDataStore.data
         .map { it[LARGE_TEXT] ?: false }
@@ -161,8 +170,16 @@ class SettingsPreferences(private val context: Context) {
         context.settingsDataStore.edit { it[ENTER_TO_SEND] = enabled }
     }
 
+    suspend fun setBiometricLock(enabled: Boolean) {
+        context.settingsDataStore.edit { it[BIOMETRIC_LOCK] = enabled }
+    }
+
     suspend fun setHighContrast(enabled: Boolean) {
         context.settingsDataStore.edit { it[HIGH_CONTRAST] = enabled }
+    }
+
+    suspend fun setAmoledMode(enabled: Boolean) {
+        context.settingsDataStore.edit { it[AMOLED_MODE] = enabled }
     }
 
     suspend fun setLargeText(enabled: Boolean) {

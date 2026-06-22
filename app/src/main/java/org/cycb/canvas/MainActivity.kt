@@ -12,19 +12,24 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
+import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import org.cycb.canvas.service.CallOverlayService
 import org.cycb.canvas.ui.CYCBApp
 import org.cycb.canvas.ui.theme.CYCBChatTheme
+import org.cycb.canvas.utils.BiometricHelper
 import org.cycb.canvas.utils.NotificationPermissionHelper
 import org.cycb.canvas.utils.OverlayPermissionHelper
+import org.cycb.canvas.viewmodel.SettingsViewModel
 import org.cycb.canvas.viewmodel.VoiceCallViewModel
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     companion object {
         var hasActiveCall = false
         var currentCallChatName = "Voice Call"
@@ -43,20 +48,45 @@ class MainActivity : ComponentActivity() {
             NotificationPermissionHelper.requestNotificationPermission(this)
         }
 
+        val settingsPrefs = org.cycb.canvas.data.preferences.SettingsPreferences(this)
+        var isUnlocked by mutableStateOf(false)
+
+        lifecycleScope.launch {
+            val biometricEnabled = settingsPrefs.biometricLock.first()
+            if (biometricEnabled && BiometricHelper.isBiometricAvailable(this@MainActivity)) {
+                BiometricHelper.showBiometricPrompt(
+                    activity = this@MainActivity,
+                    onSuccess = { isUnlocked = true },
+                    onError = { error ->
+                        // Handle error, maybe show a message or close the app
+                        if (error != "Authentication failed") {
+                            finish()
+                        }
+                    }
+                )
+            } else {
+                isUnlocked = true
+            }
+        }
+
         setContent {
             val voiceCallViewModel = viewModel<VoiceCallViewModel>()
             val currentCall by voiceCallViewModel.currentCall.collectAsState()
 
             CYCBChatTheme {
                 Surface(
-                        modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.background
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
                 ) {
-                    CYCBApp(
+                    if (isUnlocked) {
+                        CYCBApp(
                             initialRoute = intent.getStringExtra("navigateTo"),
                             chatId = intent.getStringExtra("chatId"),
                             userId = intent.getStringExtra("userId")
-                    )
+                        )
+                    } else {
+                        // Empty surface or splash screen while locked
+                    }
                 }
             }
         }

@@ -339,7 +339,8 @@ fun ProfileTopBar(
             ) {
                 Text(
                     userName,
-                    style = MaterialTheme.typography.titleLarge
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                 )
             }
         },

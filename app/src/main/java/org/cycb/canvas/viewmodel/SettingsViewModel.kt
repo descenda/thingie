@@ -60,7 +60,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val enterToSend = settingsPreferences.enterToSend
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
+    val biometricLock = settingsPreferences.biometricLock
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     val highContrast = settingsPreferences.highContrast
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val amoledMode = settingsPreferences.amoledMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val largeText = settingsPreferences.largeText
@@ -165,9 +171,21 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun setBiometricLock(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsPreferences.setBiometricLock(enabled)
+        }
+    }
+
     fun setHighContrast(enabled: Boolean) {
         viewModelScope.launch {
             settingsPreferences.setHighContrast(enabled)
+        }
+    }
+
+    fun setAmoledMode(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsPreferences.setAmoledMode(enabled)
         }
     }
 

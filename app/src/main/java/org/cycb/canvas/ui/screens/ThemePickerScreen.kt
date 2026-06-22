@@ -87,7 +87,7 @@ fun ThemePickerScreen(
                 title = {
                     Text(
                         "Choose Theme",
-                        style = MaterialTheme.typography.headlineMedium,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                 },

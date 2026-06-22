@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,13 +55,17 @@ fun ChatsListScreen(
     onSearchClick: () -> Unit = {},
     onDemoClick: () -> Unit = {},
     userProfilePicture: String? = null,
-    userDisplayName: String = ""
+    userDisplayName: String = "",
+    isSidebar: Boolean = false
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val pinnedChatIds by viewModel.pinnedChatIds.collectAsState()
+    val folders by viewModel.folders.collectAsState()
     val listState = rememberLazyListState()
     var isRefreshing by remember { mutableStateOf(false) }
+
+    var selectedFolderId by remember { mutableStateOf<String?>(null) } // null means "All Chats"
 
     var showOptionsSheet by remember { mutableStateOf(false) }
     var selectedChatId by remember { mutableStateOf<String?>(null) }
@@ -79,6 +84,7 @@ fun ChatsListScreen(
         ChatOptionsSheet(
             chatId = selectedChatId!!,
             isPinned = pinnedChatIds.contains(selectedChatId),
+            folders = folders,
             onDismiss = { showOptionsSheet = false },
             onPinClick = {
                 viewModel.togglePinChat(selectedChatId!!)
@@ -87,25 +93,62 @@ fun ChatsListScreen(
             onDeleteClick = {
                 viewModel.hideChat(selectedChatId!!)
                 showOptionsSheet = false
+            },
+            onAddToFolderClick = { folderId ->
+                val folder = folders.find { it.id == folderId }
+                if (folder != null) {
+                    viewModel.updateFolder(folder.copy(chatIds = folder.chatIds + selectedChatId!!))
+                }
+                showOptionsSheet = false
+            },
+            onCreateFolderClick = { name ->
+                viewModel.createFolder(name, setOf(selectedChatId!!))
+                showOptionsSheet = false
             }
         )
     }
 
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(
         state = rememberTopAppBarState()
     )
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            ChatsTopAppBar(
-                onDiscoverClick = onDiscoverClick,
-                onSearchClick = onSearchClick,
-                onProfileClick = onProfileClick,
-                userProfilePicture = userProfilePicture,
-                userDisplayName = userDisplayName,
-                scrollBehavior = scrollBehavior
-            )
+            if (!isSidebar) {
+                Column {
+                    ChatsTopAppBar(
+                        onDiscoverClick = onDiscoverClick,
+                        onSearchClick = onSearchClick,
+                        onProfileClick = onProfileClick,
+                        userProfilePicture = userProfilePicture,
+                        userDisplayName = userDisplayName,
+                        scrollBehavior = scrollBehavior
+                    )
+                    
+                    if (folders.isNotEmpty()) {
+                        SecondaryScrollableTabRow(
+                            selectedTabIndex = if (selectedFolderId == null) 0 else folders.indexOfFirst { it.id == selectedFolderId } + 1,
+                            edgePadding = 16.dp,
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            divider = {}
+                        ) {
+                            Tab(
+                                selected = selectedFolderId == null,
+                                onClick = { selectedFolderId = null },
+                                text = { Text("All Chats") }
+                            )
+                            folders.forEach { folder ->
+                                Tab(
+                                    selected = selectedFolderId == folder.id,
+                                    onClick = { selectedFolderId = folder.id },
+                                    text = { Text(folder.name) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     ) { paddingValues ->
 
@@ -124,15 +167,22 @@ fun ChatsListScreen(
                     LoadingState()
                 }
                 is ChatsUiState.Success -> {
-                    val chats = state.chats
-                    if (chats.isEmpty()) {
+                    val allChats = state.chats
+                    val filteredChats = if (selectedFolderId == null) {
+                        allChats
+                    } else {
+                        val folder = folders.find { it.id == selectedFolderId }
+                        allChats.filter { folder?.chatIds?.contains(it.getChatId()) == true }
+                    }
+
+                    if (filteredChats.isEmpty()) {
                         EmptyState(
                             onCreateChatClick = onCreateChatClick,
-                            isSearching = searchQuery.isNotBlank()
+                            isSearching = searchQuery.isNotBlank() || selectedFolderId != null
                         )
                     } else {
                         ChatsList(
-                            chats = chats,
+                            chats = filteredChats,
                             pinnedChatIds = pinnedChatIds,
                             onChatClick = onChatClick,
                             onChatLongClick = { chatId ->
@@ -140,7 +190,8 @@ fun ChatsListScreen(
                                 showOptionsSheet = true
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                             },
-                            listState = listState
+                            listState = listState,
+                            isSidebar = isSidebar
                         )
                     }
                 }
@@ -164,13 +215,25 @@ private fun ChatsTopAppBar(
     userDisplayName: String = "",
     scrollBehavior: TopAppBarScrollBehavior
 ) {
-    LargeTopAppBar(
+    TopAppBar(
         title = {
             Text(
                 "Chats",
-                style = MaterialTheme.typography.headlineLarge,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
             )
+        },
+        navigationIcon = {
+            IconButton(
+                onClick = onProfileClick,
+                modifier = Modifier.padding(start = 4.dp)
+            ) {
+                ProfilePicture(
+                    imageUrl = userProfilePicture,
+                    displayName = userDisplayName,
+                    size = 32.dp
+                )
+            }
         },
         actions = {
             IconButton(onClick = onSearchClick) {
@@ -179,20 +242,9 @@ private fun ChatsTopAppBar(
             IconButton(onClick = onDiscoverClick) {
                 Icon(Icons.Default.Explore, "Discover")
             }
-            Spacer(Modifier.width(4.dp))
-            IconButton(
-                onClick = onProfileClick,
-                modifier = Modifier.padding(end = 4.dp)
-            ) {
-                ProfilePicture(
-                    imageUrl = userProfilePicture,
-                    displayName = userDisplayName,
-                    size = 36.dp
-                )
-            }
         },
         scrollBehavior = scrollBehavior,
-        colors = TopAppBarDefaults.largeTopAppBarColors(
+        colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.surface,
             scrolledContainerColor = MaterialTheme.colorScheme.surface
         ),
@@ -206,11 +258,12 @@ private fun ChatsList(
     pinnedChatIds: Set<String>,
     onChatClick: (String) -> Unit,
     onChatLongClick: (String) -> Unit,
-    listState: androidx.compose.foundation.lazy.LazyListState
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    isSidebar: Boolean = false
 ) {
     LazyColumn(
         state = listState,
-        contentPadding = PaddingValues(top = 8.dp, bottom = 100.dp),
+        contentPadding = PaddingValues(top = if (isSidebar) 4.dp else 8.dp, bottom = if (isSidebar) 16.dp else 100.dp),
         modifier = Modifier.fillMaxSize()
     ) {
         items(
@@ -392,7 +445,48 @@ private fun formatTimestamp(timestamp: String): String {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatOptionsSheet(chatId: String, isPinned: Boolean, onDismiss: () -> Unit, onPinClick: () -> Unit, onDeleteClick: () -> Unit) {
+fun ChatOptionsSheet(
+    chatId: String,
+    isPinned: Boolean,
+    folders: List<org.cycb.canvas.data.model.ChatFolder>,
+    onDismiss: () -> Unit,
+    onPinClick: () -> Unit,
+    onDeleteClick: () -> Unit,
+    onAddToFolderClick: (String) -> Unit = {},
+    onCreateFolderClick: (String) -> Unit = {}
+) {
+    var showCreateFolderDialog by remember { mutableStateOf(false) }
+    var folderName by remember { mutableStateOf("") }
+
+    if (showCreateFolderDialog) {
+        AlertDialog(
+            onDismissRequest = { showCreateFolderDialog = false },
+            title = { Text("New Folder") },
+            text = {
+                OutlinedTextField(
+                    value = folderName,
+                    onValueChange = { folderName = it },
+                    label = { Text("Folder Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (folderName.isNotBlank()) {
+                            onCreateFolderClick(folderName)
+                            showCreateFolderDialog = false
+                        }
+                    }
+                ) { Text("Create") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreateFolderDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
             ListItem(
@@ -400,8 +494,40 @@ fun ChatOptionsSheet(chatId: String, isPinned: Boolean, onDismiss: () -> Unit, o
                 leadingContent = { Icon(Icons.Default.PushPin, null) },
                 modifier = Modifier.clickable { onPinClick() }
             )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp)
+
+            Text(
+                "Folders",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+
+            folders.forEach { folder ->
+                val isInFolder = folder.chatIds.contains(chatId)
+                ListItem(
+                    headlineContent = { Text(folder.name) },
+                    leadingContent = { Icon(Icons.Default.Folder, null) },
+                    trailingContent = {
+                        if (isInFolder) {
+                            Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                        }
+                    },
+                    modifier = Modifier.clickable { onAddToFolderClick(folder.id) }
+                )
+            }
+
             ListItem(
-                headlineContent = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                headlineContent = { Text("New Folder...") },
+                leadingContent = { Icon(Icons.Default.CreateNewFolder, null) },
+                modifier = Modifier.clickable { showCreateFolderDialog = true }
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp)
+
+            ListItem(
+                headlineContent = { Text("Delete Chat", color = MaterialTheme.colorScheme.error) },
                 leadingContent = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
                 modifier = Modifier.clickable { onDeleteClick() }
             )

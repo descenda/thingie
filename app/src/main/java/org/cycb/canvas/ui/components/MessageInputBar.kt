@@ -2,6 +2,8 @@ package org.cycb.canvas.ui.components
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,11 +16,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalConfiguration
+import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
@@ -29,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import java.util.Calendar
 import org.cycb.canvas.data.model.Message
 
 @Composable
@@ -44,6 +50,7 @@ fun MessageInputBar(
     selectedImageUri: android.net.Uri? = null,
     onRemoveImage: () -> Unit = {},
     onGifClick: (() -> Unit)? = null,
+    onScheduleMessage: ((Long) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -51,9 +58,24 @@ fun MessageInputBar(
     val focusRequester = remember { FocusRequester() }
     var isExpanded by remember { mutableStateOf(true) }
 
-    // Auto-collapse additional icons when user starts typing
-    LaunchedEffect(message) {
-        if (message.isNotEmpty() && isExpanded) {
+    var showScheduleDialog by remember { mutableStateOf(false) }
+
+    if (showScheduleDialog) {
+        ScheduleMessageDialog(
+            onDismiss = { showScheduleDialog = false },
+            onSchedule = { time ->
+                onScheduleMessage?.invoke(time)
+                showScheduleDialog = false
+            }
+        )
+    }
+
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    // Auto-collapse additional icons when user starts typing or in landscape
+    LaunchedEffect(message, isLandscape) {
+        if ((message.isNotEmpty() || isLandscape) && isExpanded) {
             isExpanded = false
         }
     }
@@ -81,6 +103,7 @@ fun MessageInputBar(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(bottom = if (isLandscape) 0.dp else 0.dp) // Resetting or adjusting
                 .navigationBarsPadding()
         ) {
             // Preview Sections (Image and Reply)
@@ -90,10 +113,11 @@ fun MessageInputBar(
                 exit = shrinkVertically() + fadeOut()
             ) {
                 selectedImageUri?.let { uri ->
-                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = if (isLandscape) 4.dp else 8.dp)) {
                         ImagePreview(
                             imageUri = uri,
-                            onRemove = onRemoveImage
+                            onRemove = onRemoveImage,
+                            isCompact = isLandscape
                         )
                     }
                 }
@@ -116,7 +140,7 @@ fun MessageInputBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 4.dp, end = 8.dp, top = 4.dp, bottom = 8.dp),
+                    .padding(start = 4.dp, end = 8.dp, top = if (isLandscape) 2.dp else 4.dp, bottom = if (isLandscape) 2.dp else 8.dp),
                 verticalAlignment = Alignment.Bottom
             ) {
                 // Actions Expand Button (The "+" button)
@@ -185,7 +209,7 @@ fun MessageInputBar(
                         onValueChange = onMessageChange,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 48.dp, max = 150.dp)
+                            .heightIn(min = if (isLandscape) 40.dp else 48.dp, max = if (isLandscape) 100.dp else 150.dp)
                             .focusRequester(focusRequester),
                         placeholder = {
                             Text(
@@ -195,12 +219,14 @@ fun MessageInputBar(
                             )
                         },
                         trailingIcon = {
-                            IconButton(onClick = { /* Emoji Action placeholder */ }) {
-                                Icon(
-                                    imageVector = Icons.Default.SentimentSatisfiedAlt,
-                                    contentDescription = "Pick emoji",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                            if (!isLandscape) {
+                                IconButton(onClick = { /* Emoji Action placeholder */ }) {
+                                    Icon(
+                                        imageVector = Icons.Default.SentimentSatisfiedAlt,
+                                        contentDescription = "Pick emoji",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         },
                         colors = TextFieldDefaults.colors(
@@ -236,12 +262,25 @@ fun MessageInputBar(
                     contentAlignment = Alignment.Center
                 ) {
                     if (message.isNotEmpty() || isSending) {
-                        IconButton(
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onSend()
-                            },
-                            enabled = !isSending
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .combinedClickable(
+                                    onClick = {
+                                        if (!isSending) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            onSend()
+                                        }
+                                    },
+                                    onLongClick = {
+                                        if (!isSending && onScheduleMessage != null) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            showScheduleDialog = true
+                                        }
+                                    }
+                                ),
+                            contentAlignment = Alignment.Center
                         ) {
                             if (isSending) {
                                 CircularProgressIndicator(
@@ -269,6 +308,48 @@ fun MessageInputBar(
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ScheduleMessageDialog(
+    onDismiss: () -> Unit,
+    onSchedule: (Long) -> Unit
+) {
+    val datePickerState = rememberDatePickerState()
+    val timePickerState = rememberTimePickerState()
+    var showTimePicker by remember { mutableStateOf(false) }
+
+    if (!showTimePicker) {
+        DatePickerDialog(
+            onDismissRequest = onDismiss,
+            confirmButton = {
+                TextButton(onClick = { showTimePicker = true }) { Text("Next") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    } else {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Select Time") },
+            text = { TimePicker(state = timePickerState) },
+            confirmButton = {
+                TextButton(onClick = {
+                    val date = datePickerState.selectedDateMillis ?: System.currentTimeMillis()
+                    val calendar = Calendar.getInstance().apply {
+                        timeInMillis = date
+                        set(Calendar.HOUR_OF_DAY, timePickerState.hour)
+                        set(Calendar.MINUTE, timePickerState.minute)
+                    }
+                    onSchedule(calendar.timeInMillis)
+                }) { Text("Schedule") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) { Text("Back") }
+            }
+        )
     }
 }
 

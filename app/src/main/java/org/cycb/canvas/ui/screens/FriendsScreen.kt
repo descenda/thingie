@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -31,7 +32,11 @@ fun FriendsScreen(
     viewModel: FriendsViewModel,
     onFriendClick: (String) -> Unit,
     onMessageClick: (String) -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onProfileClick: () -> Unit = {},
+    userProfilePicture: String? = null,
+    userDisplayName: String = "",
+    isSidebar: Boolean = false
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -40,24 +45,35 @@ fun FriendsScreen(
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                title = {
-                    Text(
-                        "People",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                actions = {
-                    IconButton(onClick = { showAddFriendDialog = true }) {
-                        Icon(Icons.Default.PersonAdd, "Add Friend")
-                    }
-                },
-                colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                windowInsets = WindowInsets(0, 0, 0, 0)
-            )
+            if (!isSidebar) {
+                TopAppBar(
+                    title = {
+                        Text(
+                            "People",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onProfileClick) {
+                            org.cycb.canvas.ui.components.ProfilePicture(
+                                imageUrl = userProfilePicture,
+                                displayName = userDisplayName,
+                                size = 32.dp
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { showAddFriendDialog = true }) {
+                            Icon(Icons.Default.PersonAdd, "Add Friend")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    windowInsets = WindowInsets(0, 0, 0, 0)
+                )
+            }
         }
     ) { innerPadding ->
         Column(
@@ -134,7 +150,8 @@ fun FriendsScreen(
                                 },
                                 onFriendClick = onFriendClick,
                                 onMessageClick = onMessageClick,
-                                onRemoveFriend = { viewModel.removeFriend(it) }
+                                onRemoveFriend = { viewModel.removeFriend(it) },
+                                isSidebar = isSidebar
                             )
                             1 -> FriendRequestsList(
                                 requests = state.friendRequests.filter {
@@ -142,7 +159,8 @@ fun FriendsScreen(
                                             it.username.contains(searchQuery, ignoreCase = true)
                                 },
                                 onAccept = { viewModel.acceptFriendRequest(it) },
-                                onDecline = { viewModel.declineFriendRequest(it) }
+                                onDecline = { viewModel.declineFriendRequest(it) },
+                                isSidebar = isSidebar
                             )
                         }
                     }
@@ -175,14 +193,15 @@ fun FriendsList(
     friends: List<User>,
     onFriendClick: (String) -> Unit,
     onMessageClick: (String) -> Unit,
-    onRemoveFriend: (String) -> Unit
+    onRemoveFriend: (String) -> Unit,
+    isSidebar: Boolean = false
 ) {
     if (friends.isEmpty()) {
         EmptyState(icon = Icons.Default.PersonOff, message = "No friends found")
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 8.dp, bottom = 120.dp)
+            contentPadding = PaddingValues(top = if (isSidebar) 4.dp else 8.dp, bottom = if (isSidebar) 16.dp else 120.dp)
         ) {
             itemsIndexed(friends) { _, friend ->
                 FriendListItem(
@@ -251,14 +270,15 @@ fun FriendListItem(
 fun FriendRequestsList(
     requests: List<User>,
     onAccept: (String) -> Unit,
-    onDecline: (String) -> Unit
+    onDecline: (String) -> Unit,
+    isSidebar: Boolean = false
 ) {
     if (requests.isEmpty()) {
         EmptyState(icon = Icons.Default.CheckCircle, message = "No pending requests")
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 8.dp, bottom = 120.dp)
+            contentPadding = PaddingValues(top = if (isSidebar) 4.dp else 8.dp, bottom = if (isSidebar) 16.dp else 120.dp)
         ) {
             itemsIndexed(requests) { _, request ->
                 FriendRequestListItem(
